@@ -22,7 +22,7 @@ class Transform():
         except ValueError:
             print("Formato de data inválido. Certifique-se de que são números inteiros.")
 
-        date_day = datetime.date(ano, mes, dia)
+        date_day = datetime.date(ano, dia, mes)
 
         if date_day.weekday() != 5 or date_day.weekday() != 6:
             status = False
@@ -47,7 +47,7 @@ class Transform():
         except ValueError:
             print("Formato de data inválido. Certifique-se de que são números inteiros.")
 
-        date_day = datetime.date(ano, mes, dia)
+        date_day = datetime.date(ano, dia, mes)
 
         satats = date_day in us_holidays
         return satats
@@ -56,7 +56,7 @@ class Transform():
         horas, min, seg = int, int, int
         period = str
         datetime_split = date_str.split(' ')
-        partes_data = datetime_split[0].split(':')
+        partes_data = datetime_split[1].split(':')
 
 
         if len(partes_data) != 3:
@@ -100,20 +100,4 @@ class Transform():
             print('Zona não registrada no catalogo de zonas' )
         
         return zone
-    
-
-
-
-
-
-
-def main():
-    data = Transform()
-
-if __name__ == "__main__":
-    main()
-
-
-
-
     
