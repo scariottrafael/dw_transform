@@ -1,5 +1,6 @@
 #----------------------------------------------Libs------------------------------------------------------
-
+# pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib 
+# instal- upload data to drive 
 import numpy as np
 import csv
 import pandas as pd
@@ -8,6 +9,9 @@ import psycopg2
 import re
 import holidays
 import datetime
+
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 #---------------------------------------------------Functions-------------------------------------------------
 def handle_scd_type2(source_df, target_df, attributes):
     # Create a copy of the source DataFrame to avoid modifying the original data
@@ -152,14 +156,16 @@ def split_date_time(date_time):
 #---------------------------------------------------Main-------------------------------------------------
 #---------------------------------------------------Gen_Dim-------------------------------------------------
 
-df_crime = pd.read_csv('Crimes_-_2022.csv', header=0, low_memory=False)
+##############################################Run_1_time_to_gen_dimentions######################################
+
+df_crime = pd.read_csv('Crimes_-_2022 (1).csv', header=0, low_memory=False)
 
 # Vamos dropar as colunas X Coordinate, Y Coordinate, Latitude e Longitude
 df_crime = df_crime.drop(['Latitude', 'Longitude', 'X Coordinate', 'Y Coordinate', 'Year'], axis=1)
 # Limpar a coluna Location pois estava vindo com NaN
 df_crime = df_crime.dropna(subset=['Location', 'Ward'], how='any')
 
-print('passei1')
+
 df_date = df_crime[['Date']]
 df_date = df_date.loc[:, ['Date']].copy()
 df_date['Period'] = df_date['Date'].apply(time_to_period)
@@ -171,7 +177,7 @@ df_date['Hour of the day'] = df_date['Date'].apply( lambda x: split_date_time(x)
 df_date['id_date'] = df_date.index + 1
 df_date.to_csv('DIM_Date.csv')
 
-print('passei2')
+
 
 df_location = df_crime[['Ward', 'District', 'Block', 'Beat', 'Community Area', 'Location Description', 'Location']]
 df_location = df_location.copy()
@@ -180,24 +186,40 @@ df_location['id_location'] = df_location.index + 1
 df_location.to_csv('DIM_Location.csv')
 
 
-print('passei3')
+
 df_location['is_active'] = True
 df_location['start_date'] = datetime.datetime.now()
 df_location['end_date'] = datetime.datetime(9999, 12, 31)
 
-print('passei4')
+
 df_StatusCrime = df_crime[['Arrest', 'Domestic']]
 df_StatusCrime['id_StatusCrime'] = df_StatusCrime.index + 1
 df_StatusCrime.to_csv('DIM_StatusCrime.csv')
 
 
-print('passei5')
+
 df_CrimeType = df_crime[['IUCR','Primary Type','Description', 'FBI Code']]
 df_CrimeType['id_CrimeType'] = df_CrimeType.index + 1
 df_CrimeType.to_csv('DIM_CrimeType.csv')
 
+df_fact = df_crime[['ID','Case Number','Updated On']]
+df_fact = pd.concat([df_fact,df_StatusCrime['id_StatusCrime']],axis=1)
+df_fact = pd.concat([df_fact,df_location['id_location']],axis=1)
+df_fact = pd.concat([df_fact,df_date['id_date']],axis=1)
+df_fact = pd.concat([df_fact,df_CrimeType['id_CrimeType']],axis=1)
+df_fact.to_csv('DIM_fato.csv')
+
 #-------------------------------------------------Loading_Data-------------------------------------------------
-# # Define the column names
+##########################################Use_alredy_created_DIM##########################################
+
+# Define the column names
+# df_crime = pd.read_csv('Crimes_-_2022.csv', header=0, low_memory=False)
+# df_date = pd.read_csv('DIM_Date.csv', header=0, low_memory=False)
+# df_location = pd.read_csv('DIM_Location.csv', header=0, low_memory=False)
+# df_StatusCrime = pd.read_csv('DIM_StatusCrime.csv', header=0, low_memory=False)
+# df_CrimeType = pd.read_csv('DIM_CrimeType.csv', header=0, low_memory=False)
+
+
 # column_names = ['Case Number', 'Updated On', 'Total Occurrences', 'Total Type Occurrences', 'Average Occurrences', 'Max Occurrences', 'Average Distance to City Center']
 
 # # Create an empty DataFrame with specified column names
@@ -209,25 +231,36 @@ df_CrimeType.to_csv('DIM_CrimeType.csv')
 
 # fato = pd.DataFrame(fato)
 
-# merged_df = fato.merge(df_crime, on =['ID'])
 
-# final_df = merged_df.merge(df_date, on='Date')
-# fato['id_date'] = final_df['id_date']
+# dim_crime = pd.DataFrame(df_crime)
+# dim_date = pd.DataFrame(df_date)
+# dim_location = pd.DataFrame(df_location)
+# dim_StatusCrime = pd.DataFrame(df_StatusCrime)
+# dim_CrimeType = pd.DataFrame(df_CrimeType)
 
-# final_df = merged_df.merge(df_CrimeType, on='IUCR')
-# fato['id_CrimeType'] = final_df['id_CrimeType']
 
-# final_df = merged_df.merge(df_StatusCrime, on='Arrest')
-# fato['id_StatusCrime'] = final_df['id_StatusCrime']
+# fato['id_date'] = fato['ID'].map(dim_crime.set_index('ID')['Date'].reset_index().merge(dim_date, on='Date').set_index('ID')['id_date'])
+# fato['id_CrimeType'] = fato['ID'].map(dim_crime.set_index('ID')['IUCR'].reset_index().merge(dim_CrimeType, on='IUCR').set_index('ID')['id_CrimeType'])
+# fato['id_StatusCrime'] = fato['ID'].map(dim_crime.set_index('ID')['Arrest'].reset_index().merge(dim_StatusCrime, on='Arrest').set_index('ID')['id_StatusCrime'])
+# fato['id_location'] = fato['ID'].map(dim_crime.set_index('ID')['Ward'].reset_index().merge(dim_location, on='Ward').set_index('ID')['id_location'])
 
-# final_df = merged_df.merge(df_location, on='Ward')
-# fato['id_location'] = final_df['id_location']
+# fato.to_csv('fact.csv')
 
-# fato = dimfato['ID'].copy()
 
-# fato = pd.DataFrame(fato)
 
-# # Assuming df_fact is your fact table and df_dim is your dimension table
-# # 'key' is the common column in both dataframes
+# drive.mount('drive')
 
-# merged_df = pd.merge(fato, df_date, how='left', left_on='id_date', right_on='id_date')
+# dim_crime.to_csv('dim_crime.csv')
+# !cp dim_crime.csv "drive/My Drive/"
+
+# dim_date.to_csv('dim_date.csv')
+# !cp dim_date.csv "drive/My Drive/"
+
+# dim_location.to_csv('dim_location.csv')
+# !cp dim_location.csv "drive/My Drive/"
+
+# dim_StatusCrime.to_csv('dim_StatusCrime.csv')
+# !cp dim_StatusCrime.csv "drive/My Drive/"
+
+# dim_CrimeType.to_csv('dim_CrimeType.csv')
+# !cp dim_CrimeType.csv "drive/My Drive/"
