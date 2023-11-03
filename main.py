@@ -10,6 +10,8 @@ import re
 import holidays
 import datetime
 
+from geopy.distance import great_circle
+
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 #---------------------------------------------------Functions-------------------------------------------------
@@ -22,7 +24,8 @@ def handle_scd_type2(source_df, target_df, attributes):
 
     # Iterate over the rows of the target DataFrame
     for index, row in target_df.iterrows():
-        # If the index is in the source DataFrame, check if any attribute has changed
+        # If the index is in the source DataFrame, check if
+        #  any attribute has changed
         if index in final_df.index:
             for attribute in attributes:
                 if final_df.loc[index, attribute] != row[attribute]:
@@ -151,6 +154,31 @@ def split_date_time(date_time):
     day = date[3:5]
     return day, month, time
 
+def center_cityzen_to_location(location):
+    # center 41.863976, -87.631273
+    lat1 = location[0]
+    lon1 = location[1]
+    lat2 = 41.863976
+    lon2 = -87.631273
+        # Use the Haversine formula to calculate the distance in meters between two points
+    geodesic_distance = great_circle((lat1, lon1), (lat2, lon2)).m
+
+    # Assuming you're working with a specific reference latitude and longitude (lat_ref, lon_ref)
+    # Calculate XY coordinates
+    lat_ref = 0  # Reference latitude in radians
+    lon_ref = 0  # Reference longitude in radians
+
+    # Radius of the Earth (mean value) in meters
+    R = 6371000
+
+    x = R * (lon2 - lon_ref)
+    y = R * (lat2 - lat_ref)
+
+    return geodesic_distance
+
+
+
+
 
 
 #---------------------------------------------------Main-------------------------------------------------
@@ -207,6 +235,7 @@ df_fact = pd.concat([df_fact,df_StatusCrime['id_StatusCrime']],axis=1)
 df_fact = pd.concat([df_fact,df_location['id_location']],axis=1)
 df_fact = pd.concat([df_fact,df_date['id_date']],axis=1)
 df_fact = pd.concat([df_fact,df_CrimeType['id_CrimeType']],axis=1)
+df_fact['avg_distance_to_city_center'] = df_crime['Location'].apply(center_cityzen_to_location)
 df_fact.to_csv('DIM_fato.csv')
 
 #-------------------------------------------------Loading_Data-------------------------------------------------
